@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Web Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+
+        #toolbar {
+            background: #252526;
+            padding: 8px 12px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        button:hover {
+            background: #1177bb;
+        }
+
+        button:active {
+            background: #094771;
+        }
+
+        #current-file {
+            margin-left: auto;
+            font-size: 13px;
+            color: #999;
+        }
+
+        #editor-container {
+            flex: 1;
+            overflow: auto;
+        }
+
+        .dialog-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dialog-overlay.active {
+            display: flex;
+        }
+
+        .dialog {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 20px;
+            min-width: 400px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .dialog h2 {
+            margin-bottom: 16px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .dialog label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .dialog input {
+            width: 100%;
+            padding: 6px 8px;
+            margin-bottom: 12px;
+            background: #3c3c3c;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            border-radius: 2px;
+            font-size: 13px;
+        }
+
+        .dialog input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+
+        .dialog-buttons button {
+            min-width: 70px;
+        }
+
+        .dialog-buttons button.cancel {
+            background: #3e3e42;
+        }
+
+        .dialog-buttons button.cancel:hover {
+            background: #505050;
+        }
+
+        #status {
+            padding: 4px 12px;
+            background: #007acc;
+            color: white;
+            font-size: 12px;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        #status.error {
+            background: #f48771;
+        }
+
+        #status.success {
+            background: #89d185;
+        }
+
+        #status:empty {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="status"></div>
+
+    <div id="toolbar">
+        <button id="btn-open-file">Open File</button>
+        <button id="btn-save-file">Save</button>
+        <button id="btn-configure-lsp">Configure LSP</button>
+        <span id="current-file">No file open</span>
+    </div>
+
+    <div id="editor-container"></div>
+
+    <!-- Open File Dialog -->
+    <div id="dialog-open-file" class="dialog-overlay">
+        <div class="dialog">
+            <h2>Open File</h2>
+            <label for="input-file-path">File Path:</label>
+            <input type="text" id="input-file-path" placeholder="/path/to/file.cpp">
+            <div class="dialog-buttons">
+                <button class="cancel" onclick="closeDialog('dialog-open-file')">Cancel</button>
+                <button onclick="openFile()">Open</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configure LSP Dialog -->
+    <div id="dialog-configure-lsp" class="dialog-overlay">
+        <div class="dialog">
+            <h2>Configure LSP</h2>
+            <label for="input-clangd-path">Clangd Path (optional):</label>
+            <input type="text" id="input-clangd-path" placeholder="clangd" value="clangd">
+            <label for="input-compile-commands">Compile Commands Directory:</label>
+            <input type="text" id="input-compile-commands" placeholder="/path/to/project" value="/Users/nikolayk/github/simpletor/sample-project/build">
+            <div class="dialog-buttons">
+                <button class="cancel" onclick="closeDialog('dialog-configure-lsp')">Cancel</button>
+                <button onclick="configureLSP()">Configure</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+    <script>
+        function showDialog(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeDialog(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = type;
+            setTimeout(() => {
+                status.textContent = '';
+                status.className = '';
+            }, 3000);
+        }
+
+        document.getElementById('btn-open-file').addEventListener('click', () => {
+            showDialog('dialog-open-file');
+        });
+
+        document.getElementById('btn-configure-lsp').addEventListener('click', () => {
+            showDialog('dialog-configure-lsp');
+        });
+
+        document.getElementById('btn-save-file').addEventListener('click', () => {
+            window.saveFile && window.saveFile();
+        });
+
+        function openFile() {
+            const path = document.getElementById('input-file-path').value;
+            if (path && window.openFileFromUI) {
+                window.openFileFromUI(path);
+                closeDialog('dialog-open-file');
+            }
+        }
+
+        function configureLSP() {
+            const clangdPath = document.getElementById('input-clangd-path').value;
+            const compileCommands = document.getElementById('input-compile-commands').value;
+            if (window.configureLSPFromUI) {
+                window.configureLSPFromUI(clangdPath, compileCommands);
+                closeDialog('dialog-configure-lsp');
+            }
+        }
+
+        // Close dialogs on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.dialog-overlay').forEach(dialog => {
+                    dialog.classList.remove('active');
+                });
+            }
+        });
+
+        // Submit on Enter in dialogs
+        document.getElementById('input-file-path').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') openFile();
+        });
+    </script>
+</body>
+</html>
