@@ -16,21 +16,21 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            background: #1e1e1e;
-            color: #d4d4d4;
+            background: #ffffff;
+            color: #333333;
         }
 
         #toolbar {
-            background: #252526;
+            background: #f5f5f5;
             padding: 8px 12px;
-            border-bottom: 1px solid #3e3e42;
+            border-bottom: 1px solid #ddd;
             display: flex;
             gap: 8px;
             align-items: center;
         }
 
         button {
-            background: #0e639c;
+            background: #0066cc;
             color: white;
             border: none;
             padding: 6px 14px;
@@ -40,17 +40,17 @@
         }
 
         button:hover {
-            background: #1177bb;
+            background: #0052a3;
         }
 
         button:active {
-            background: #094771;
+            background: #003d7a;
         }
 
         #current-file {
             margin-left: auto;
             font-size: 13px;
-            color: #999;
+            color: #666;
         }
 
         #editor-container {
@@ -76,40 +76,42 @@
         }
 
         .dialog {
-            background: #252526;
-            border: 1px solid #3e3e42;
+            background: #ffffff;
+            border: 1px solid #ccc;
             border-radius: 4px;
             padding: 20px;
             min-width: 400px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         .dialog h2 {
             margin-bottom: 16px;
             font-size: 16px;
             font-weight: 500;
+            color: #333;
         }
 
         .dialog label {
             display: block;
             margin-bottom: 6px;
             font-size: 13px;
+            color: #555;
         }
 
         .dialog input {
             width: 100%;
             padding: 6px 8px;
             margin-bottom: 12px;
-            background: #3c3c3c;
-            border: 1px solid #3e3e42;
-            color: #d4d4d4;
+            background: #ffffff;
+            border: 1px solid #ccc;
+            color: #333;
             border-radius: 2px;
             font-size: 13px;
         }
 
         .dialog input:focus {
             outline: none;
-            border-color: #007acc;
+            border-color: #0066cc;
         }
 
         .dialog-buttons {
@@ -124,27 +126,27 @@
         }
 
         .dialog-buttons button.cancel {
-            background: #3e3e42;
+            background: #999;
         }
 
         .dialog-buttons button.cancel:hover {
-            background: #505050;
+            background: #777;
         }
 
         #status {
             padding: 4px 12px;
-            background: #007acc;
+            background: #0066cc;
             color: white;
             font-size: 12px;
-            border-bottom: 1px solid #3e3e42;
+            border-bottom: 1px solid #ccc;
         }
 
         #status.error {
-            background: #f48771;
+            background: #d32f2f;
         }
 
         #status.success {
-            background: #89d185;
+            background: #4caf50;
         }
 
         #status:empty {
@@ -153,8 +155,8 @@
 
         /* Tab bar styles */
         #tab-bar {
-            background: #252526;
-            border-bottom: 1px solid #3e3e42;
+            background: #e8e8e8;
+            border-bottom: 1px solid #ccc;
             overflow-x: auto;
             overflow-y: hidden;
             white-space: nowrap;
@@ -168,15 +170,15 @@
         }
 
         #tab-bar::-webkit-scrollbar-track {
-            background: #1e1e1e;
+            background: #f5f5f5;
         }
 
         #tab-bar::-webkit-scrollbar-thumb {
-            background: #424242;
+            background: #bbb;
         }
 
         #tab-bar::-webkit-scrollbar-thumb:hover {
-            background: #4e4e4e;
+            background: #999;
         }
 
         #tab-container {
@@ -189,23 +191,23 @@
             align-items: center;
             padding: 0 12px;
             height: 100%;
-            background: #2d2d30;
-            border-right: 1px solid #3e3e42;
+            background: #d0d0d0;
+            border-right: 1px solid #bbb;
             cursor: pointer;
             font-size: 13px;
-            color: #969696;
+            color: #555;
             transition: background 0.1s;
             position: relative;
         }
 
         .tab:hover {
-            background: #323233;
+            background: #c0c0c0;
         }
 
         .tab.active {
-            background: #1e1e1e;
-            color: #ffffff;
-            border-bottom: 2px solid #007acc;
+            background: #ffffff;
+            color: #000000;
+            border-bottom: 2px solid #0066cc;
         }
 
         .tab-filename {
@@ -224,7 +226,7 @@
             border-radius: 3px;
             font-size: 16px;
             line-height: 1;
-            color: #858585;
+            color: #666;
             background: transparent;
             border: none;
             padding: 0;
@@ -232,13 +234,13 @@
         }
 
         .tab-close:hover {
-            background: #5a5a5a;
-            color: #ffffff;
+            background: #aaa;
+            color: #000;
         }
 
         .tab.dirty .tab-filename::after {
             content: ' •';
-            color: #007acc;
+            color: #0066cc;
         }
     </style>
 </head>

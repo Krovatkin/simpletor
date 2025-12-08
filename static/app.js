@@ -8,7 +8,6 @@ import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap, s
 import { highlightSelectionMatches } from 'https://esm.sh/@codemirror/search@6';
 import { python } from 'https://esm.sh/@codemirror/lang-python@6';
 import { cpp } from 'https://esm.sh/@codemirror/lang-cpp@6';
-import { oneDark } from 'https://esm.sh/@codemirror/theme-one-dark@6';
 import { linter, lintGutter } from 'https://esm.sh/@codemirror/lint@6';
 
 // Basic setup - combining extensions manually (without autocompletion - added later with LSP)
@@ -309,7 +308,6 @@ function createEditorState(content, filePath) {
         extensions: [
             basicSetup,
             languageExtension,
-            oneDark,
             updateListener,
             lintGutter(),
             lspLinter,
