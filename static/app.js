@@ -36,6 +36,10 @@ let editor = null;
 let currentFilePath = null;
 let isApplyingRemoteChange = false;
 
+// Tab management
+let openTabs = [];
+let activeTabIndex = -1;
+
 // Initialize WebSocket
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -115,18 +119,75 @@ window.currentDiagnostics = currentDiagnostics;  // Expose for tests
 let completionRequestId = 1000;  // Start at 1000 to avoid conflicts with LSP initialize
 let pendingCompletionRequests = new Map();
 
-// Create CodeMirror editor
-function createEditor(content = '', filePath = '') {
-    console.log('DEBUG: createEditor called with filePath:', filePath);
-    const container = document.getElementById('editor-container');
+// Tab Management Functions
+
+function createTab(path, content) {
+    const filename = path.split('/').pop();
+    return {
+        path: path,
+        filename: filename,
+        editorState: null,  // Will be created later
+        diagnostics: [],
+        isDirty: false,
+        version: 1
+    };
+}
+
+function findTabIndex(path) {
+    return openTabs.findIndex(tab => tab.path === path);
+}
+
+function renderTabs() {
+    const container = document.getElementById('tab-container');
     container.innerHTML = '';
 
-    const languageExtension = getLanguageExtension(filePath);
-    console.log('DEBUG: Language extension:', languageExtension);
+    openTabs.forEach((tab, index) => {
+        const tabElement = document.createElement('div');
+        tabElement.className = 'tab' + (index === activeTabIndex ? ' active' : '') + (tab.isDirty ? ' dirty' : '');
+        tabElement.title = tab.path;  // Tooltip shows full path
 
-    // Create LSP linter inside the function to avoid state instance conflicts
+        const filenameSpan = document.createElement('span');
+        filenameSpan.className = 'tab-filename';
+        filenameSpan.textContent = tab.filename;
+
+        const closeButton = document.createElement('button');
+        closeButton.className = 'tab-close';
+        closeButton.innerHTML = '×';
+        closeButton.onclick = (e) => {
+            e.stopPropagation();
+            closeTab(index);
+        };
+
+        tabElement.appendChild(filenameSpan);
+        tabElement.appendChild(closeButton);
+
+        tabElement.onclick = () => switchToTab(index);
+
+        container.appendChild(tabElement);
+    });
+}
+
+function updateCurrentFileDisplay() {
+    const display = document.getElementById('current-file');
+    if (activeTabIndex >= 0 && activeTabIndex < openTabs.length) {
+        display.textContent = openTabs[activeTabIndex].path;
+    } else {
+        display.textContent = 'No file open';
+    }
+}
+
+// Create editor state for a tab
+function createEditorState(content, filePath) {
+    const languageExtension = getLanguageExtension(filePath);
+
+    // Get diagnostics for this file
+    const tab = openTabs.find(t => t.path === filePath);
+    const diagnostics = tab ? tab.diagnostics : [];
+
+    // Create LSP linter that reads from current tab's diagnostics
     const lspLinter = linter((view) => {
-        return currentDiagnostics;
+        const activeTab = openTabs[activeTabIndex];
+        return activeTab ? activeTab.diagnostics : [];
     });
 
     // LSP-based autocompletion source
@@ -235,11 +296,15 @@ function createEditor(content = '', filePath = '') {
     const updateListener = EditorView.updateListener.of((update) => {
         if (update.docChanged && !isApplyingRemoteChange) {
             sendDeltas(update);
+            // Mark tab as dirty
+            if (activeTabIndex >= 0 && activeTabIndex < openTabs.length) {
+                openTabs[activeTabIndex].isDirty = true;
+                renderTabs();
+            }
         }
     });
 
-    console.log('DEBUG: Creating EditorState...');
-    const state = EditorState.create({
+    return EditorState.create({
         doc: content,
         extensions: [
             basicSetup,
@@ -253,7 +318,6 @@ function createEditor(content = '', filePath = '') {
                 activateOnTyping: true,
                 defaultKeymap: true,
                 activateOnCompletion: () => true,  // Keep autocomplete open
-                // Explicitly trigger on common C++ completion characters
                 closeOnBlur: true,
                 interactionDelay: 75  // Small delay to batch rapid typing
             }),
@@ -264,14 +328,118 @@ function createEditor(content = '', filePath = '') {
             ]))
         ],
     });
+}
 
-    console.log('DEBUG: Creating EditorView...');
+// Initialize editor once (called on startup)
+function initializeEditor() {
+    const container = document.getElementById('editor-container');
+    container.innerHTML = '';
+
+    const emptyState = createEditorState('// Open a file to start editing', '');
     editor = new EditorView({
-        state,
+        state: emptyState,
         parent: container,
     });
     window.editor = editor;  // Expose to window for tests
-    console.log('DEBUG: Editor created successfully');
+}
+
+// Tab Operations
+
+// Open a new tab or switch to existing one
+function openTab(path, content) {
+    // Check if tab already exists
+    const existingIndex = findTabIndex(path);
+    if (existingIndex >= 0) {
+        switchToTab(existingIndex);
+        return;
+    }
+
+    // Create new tab
+    const tab = createTab(path, content);
+    tab.editorState = createEditorState(content, path);
+    openTabs.push(tab);
+
+    // Switch to new tab
+    switchToTab(openTabs.length - 1);
+
+    // Render tabs
+    renderTabs();
+}
+
+// Switch to a different tab
+function switchToTab(index) {
+    if (index < 0 || index >= openTabs.length || index === activeTabIndex) {
+        return;
+    }
+
+    // Save current tab's state
+    if (activeTabIndex >= 0 && editor) {
+        openTabs[activeTabIndex].editorState = editor.state;
+    }
+
+    // Update active index
+    activeTabIndex = index;
+    const tab = openTabs[activeTabIndex];
+
+    // Update currentFilePath for LSP
+    currentFilePath = tab.path;
+
+    // Restore tab's editor state
+    editor.setState(tab.editorState);
+
+    // Update UI
+    renderTabs();
+    updateCurrentFileDisplay();
+
+    // Send open_file to server to update its currentFile pointer
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: 'open_file',
+            payload: { path: tab.path },
+        }));
+    }
+}
+
+// Close a tab
+function closeTab(index) {
+    if (index < 0 || index >= openTabs.length) {
+        return;
+    }
+
+    const tab = openTabs[index];
+
+    // Check if tab has unsaved changes
+    if (tab.isDirty) {
+        const confirmClose = confirm(`${tab.filename} has unsaved changes. Close anyway?`);
+        if (!confirmClose) {
+            return;
+        }
+    }
+
+    // Remove tab
+    openTabs.splice(index, 1);
+
+    // Update active index
+    if (activeTabIndex === index) {
+        // Closed the active tab
+        if (openTabs.length === 0) {
+            activeTabIndex = -1;
+            currentFilePath = null;
+            // Reset editor to empty state
+            editor.setState(createEditorState('// Open a file to start editing', ''));
+        } else {
+            // Switch to previous tab or first tab
+            activeTabIndex = Math.max(0, index - 1);
+            switchToTab(activeTabIndex);
+        }
+    } else if (activeTabIndex > index) {
+        // Adjust active index if we closed a tab before it
+        activeTabIndex--;
+    }
+
+    // Render tabs
+    renderTabs();
+    updateCurrentFileDisplay();
 }
 
 // Send deltas to server
@@ -294,9 +462,7 @@ function sendDeltas(update) {
 
 // Load file content into editor
 function loadFileContent(path, content) {
-    currentFilePath = path;
-    document.getElementById('current-file').textContent = path;
-    createEditor(content, path);
+    openTab(path, content);
 }
 
 // Open file from UI
@@ -333,7 +499,7 @@ window.configureLSPFromUI = (clangdPath, compileCommandsDir) => {
 
 // Save file
 window.saveFile = () => {
-    if (!currentFilePath || !editor) {
+    if (!currentFilePath || !editor || activeTabIndex < 0) {
         showStatus('No file open', 'error');
         return;
     }
@@ -348,6 +514,12 @@ window.saveFile = () => {
                 content,
             },
         }));
+
+        // Mark tab as clean
+        if (activeTabIndex >= 0 && activeTabIndex < openTabs.length) {
+            openTabs[activeTabIndex].isDirty = false;
+            renderTabs();
+        }
     } else {
         showStatus('Not connected to server', 'error');
     }
@@ -358,18 +530,29 @@ function handleLSPNotification(payload) {
     const notification = typeof payload === 'string' ? JSON.parse(payload) : payload;
 
     if (notification.method === 'textDocument/publishDiagnostics') {
-        const diagnostics = notification.params.diagnostics || [];
-        currentDiagnostics = diagnostics.map(diag => ({
-            from: positionToOffset(editor.state.doc, diag.range.start),
-            to: positionToOffset(editor.state.doc, diag.range.end),
-            severity: diag.severity === 1 ? 'error' : diag.severity === 2 ? 'warning' : 'info',
-            message: diag.message,
-        }));
-        window.currentDiagnostics = currentDiagnostics;  // Update window reference
+        const fileUri = notification.params.uri;
+        const filePath = fileUri.replace('file://', '');
 
-        // Trigger re-lint
-        if (editor) {
-            editor.dispatch({});
+        // Find the tab for this file
+        const tabIndex = findTabIndex(filePath);
+        if (tabIndex >= 0) {
+            const tab = openTabs[tabIndex];
+
+            // Get the correct document for mapping positions
+            const doc = tabIndex === activeTabIndex ? editor.state.doc : tab.editorState.doc;
+
+            // Convert diagnostics to CodeMirror format
+            tab.diagnostics = (notification.params.diagnostics || []).map(diag => ({
+                from: positionToOffset(doc, diag.range.start),
+                to: positionToOffset(doc, diag.range.end),
+                severity: diag.severity === 1 ? 'error' : diag.severity === 2 ? 'warning' : 'info',
+                message: diag.message,
+            }));
+
+            // If this is the active tab, trigger re-lint
+            if (tabIndex === activeTabIndex && editor) {
+                editor.dispatch({});
+            }
         }
     }
 }
@@ -448,6 +631,6 @@ function offsetToPosition(doc, offset) {
 
 // Initialize on load
 window.addEventListener('DOMContentLoaded', () => {
-    createEditor('// Open a file to start editing', '');
+    initializeEditor();
     connectWebSocket();
 });
