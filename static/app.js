@@ -2,9 +2,9 @@
 // Use @6 without specific versions to let esm.sh deduplicate dependencies
 import { EditorView, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, keymap } from 'https://esm.sh/@codemirror/view@6';
 import { EditorState, Prec } from 'https://esm.sh/@codemirror/state@6';
-import { defaultKeymap, history, historyKeymap } from 'https://esm.sh/@codemirror/commands@6';
+import { defaultKeymap, history, historyKeymap, indentWithTab, insertTab } from 'https://esm.sh/@codemirror/commands@6';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from 'https://esm.sh/@codemirror/language@6';
-import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap, startCompletion, snippetCompletion } from 'https://esm.sh/@codemirror/autocomplete@6';
+import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap, startCompletion, snippetCompletion, nextSnippetField, prevSnippetField, hasNextSnippetField, hasPrevSnippetField } from 'https://esm.sh/@codemirror/autocomplete@6';
 import { highlightSelectionMatches } from 'https://esm.sh/@codemirror/search@6';
 import { python } from 'https://esm.sh/@codemirror/lang-python@6';
 import { cpp } from 'https://esm.sh/@codemirror/lang-cpp@6';
@@ -321,7 +321,9 @@ function createEditorState(content, filePath) {
                 closeOnBlur: true,
                 interactionDelay: 75  // Small delay to batch rapid typing
             }),
-            // Add custom keybindings with high priority
+            // Tab handling (lower precedence than snippet navigation)
+            keymap.of([indentWithTab]),
+            // Custom keybindings with high priority
             Prec.highest(keymap.of([
                 { key: 'Ctrl-l', run: startCompletion },
                 { key: 'Ctrl-Space', run: startCompletion }  // Standard autocomplete shortcut
