@@ -109,7 +109,18 @@
             font-size: 13px;
         }
 
-        .dialog input:focus {
+        .dialog select {
+            width: 100%;
+            padding: 6px 8px;
+            margin-bottom: 12px;
+            background: #ffffff;
+            border: 1px solid #ccc;
+            color: #333;
+            border-radius: 2px;
+            font-size: 13px;
+        }
+
+        .dialog input:focus, .dialog select:focus {
             outline: none;
             border-color: #0066cc;
         }
@@ -280,9 +291,14 @@
     <div id="dialog-configure-lsp" class="dialog-overlay">
         <div class="dialog">
             <h2>Configure LSP</h2>
-            <label for="input-clangd-path">Clangd Path (optional):</label>
-            <input type="text" id="input-clangd-path" placeholder="clangd" value="clangd">
-            <label for="input-compile-commands">Compile Commands Directory:</label>
+            <label for="input-lsp-language">Language:</label>
+            <select id="input-lsp-language" onchange="updateUIForLanguage()">
+                <option value="cpp">C/C++</option>
+                <option value="python">Python</option>
+            </select>
+            <label for="input-server-path">Server Path (optional):</label>
+            <input type="text" id="input-server-path" placeholder="clangd or pylsp">
+            <label for="input-compile-commands" id="label-project-dir">Compile Commands Directory:</label>
             <input type="text" id="input-compile-commands" placeholder="/path/to/project" value="/Users/nikolayk/github/simpletor/sample-project/build">
             <div class="dialog-buttons">
                 <button class="cancel" onclick="closeDialog('dialog-configure-lsp')">Cancel</button>
@@ -331,11 +347,31 @@
             }
         }
 
+        function updateUIForLanguage() {
+            const language = document.getElementById('input-lsp-language').value;
+            const label = document.getElementById('label-project-dir');
+            const input = document.getElementById('input-compile-commands');
+            const serverPath = document.getElementById('input-server-path');
+
+            if (language === 'python') {
+                label.textContent = 'Project Root Directory:';
+                input.placeholder = '/path/to/python/project';
+                input.value = '/Users/nikolayk/github/simpletor/sample-project';
+                serverPath.placeholder = 'pylsp';
+            } else {
+                label.textContent = 'Compile Commands Directory:';
+                input.placeholder = '/path/to/compile_commands.json/dir';
+                input.value = '/Users/nikolayk/github/simpletor/sample-project/build';
+                serverPath.placeholder = 'clangd';
+            }
+        }
+
         function configureLSP() {
-            const clangdPath = document.getElementById('input-clangd-path').value;
+            const language = document.getElementById('input-lsp-language').value;
+            const serverPath = document.getElementById('input-server-path').value;
             const compileCommands = document.getElementById('input-compile-commands').value;
             if (window.configureLSPFromUI) {
-                window.configureLSPFromUI(clangdPath, compileCommands);
+                window.configureLSPFromUI(language, serverPath, compileCommands);
                 closeDialog('dialog-configure-lsp');
             }
         }

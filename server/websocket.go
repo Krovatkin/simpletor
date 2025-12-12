@@ -19,7 +19,8 @@ type OpenFilePayload struct {
 }
 
 type ConfigureLSPPayload struct {
-	ClangdPath          string `json:"clangdPath"`
+	Language            string `json:"language"`
+	ServerPath          string `json:"serverPath"`
 	CompileCommandsDir  string `json:"compileCommandsDir"`
 }
 
@@ -42,7 +43,7 @@ type LSPRequestPayload struct {
 
 // HandleWebSocket handles WebSocket connections
 func HandleWebSocket(c *websocket.Conn) {
-	lspManager := c.Locals("lspManager").(*LSPManager)
+	lspManager := c.Locals("lspManager").(*MultiLSPManager)
 
 	var currentFile string
 	var currentContent string
@@ -113,14 +114,16 @@ func HandleWebSocket(c *websocket.Conn) {
 			log.Printf("DEBUG: file_opened response sent")
 
 			// Notify LSP about opened file
-			lspManager.SendNotification("textDocument/didOpen", map[string]interface{}{
+			if err := lspManager.RouteNotification("textDocument/didOpen", map[string]interface{}{
 				"textDocument": map[string]interface{}{
 					"uri":        "file://" + payload.Path,
 					"languageId": detectLanguage(payload.Path),
 					"version":    1,
 					"text":       content,
 				},
-			})
+			}); err != nil {
+				log.Printf("Warning: Failed to notify LSP about opened file: %v", err)
+			}
 
 		case "configure_lsp":
 			var payload ConfigureLSPPayload
@@ -129,43 +132,46 @@ func HandleWebSocket(c *websocket.Conn) {
 				continue
 			}
 
-			clangdPath := payload.ClangdPath
-			if clangdPath == "" {
-				clangdPath = "clangd"
+			language := payload.Language
+			if language == "" {
+				sendError(c, "Language is required")
+				continue
 			}
 
-			if err := lspManager.Start(clangdPath, payload.CompileCommandsDir); err != nil {
+			serverPath := payload.ServerPath
+			if serverPath == "" {
+				// Set default server paths
+				if language == "cpp" {
+					serverPath = "clangd"
+				} else if language == "python" {
+					serverPath = "pylsp"
+				} else {
+					sendError(c, "Unknown language: "+language)
+					continue
+				}
+			}
+
+			// Start the LSP server
+			if err := lspManager.StartLSP(language, serverPath, payload.CompileCommandsDir); err != nil {
 				sendError(c, "Failed to start LSP: "+err.Error())
 				continue
 			}
 
 			// Initialize LSP
-			initParams := map[string]interface{}{
-				"processId": nil,
-				"rootUri":   "file://" + payload.CompileCommandsDir,
-				"capabilities": map[string]interface{}{
-					"textDocument": map[string]interface{}{
-						"completion": map[string]interface{}{
-							"completionItem": map[string]interface{}{
-								"snippetSupport": true,
-							},
-						},
-						"publishDiagnostics": map[string]interface{}{},
-					},
-				},
+			rootDir := payload.CompileCommandsDir
+			if rootDir == "" {
+				rootDir = "/"
 			}
-
-			if _, err := lspManager.SendRequest("initialize", initParams); err != nil {
+			if err := lspManager.InitializeLSP(language, rootDir); err != nil {
 				sendError(c, "Failed to initialize LSP: "+err.Error())
 				continue
 			}
 
-			lspManager.SendNotification("initialized", map[string]interface{}{})
-
 			response := map[string]interface{}{
 				"type": "lsp_configured",
-				"payload": map[string]bool{
-					"success": true,
+				"payload": map[string]interface{}{
+					"success":  true,
+					"language": language,
 				},
 			}
 			c.WriteJSON(response)
@@ -188,7 +194,7 @@ func HandleWebSocket(c *websocket.Conn) {
 			mu.Unlock()
 
 			// Notify LSP about change
-			lspManager.SendNotification("textDocument/didChange", map[string]interface{}{
+			if err := lspManager.RouteNotification("textDocument/didChange", map[string]interface{}{
 				"textDocument": map[string]interface{}{
 					"uri":     "file://" + currentFile,
 					"version": 1,
@@ -198,7 +204,9 @@ func HandleWebSocket(c *websocket.Conn) {
 						"text": currentContent,
 					},
 				},
-			})
+			}); err != nil {
+				log.Printf("Warning: Failed to notify LSP about change: %v", err)
+			}
 
 		case "save":
 			var payload SavePayload
@@ -221,11 +229,13 @@ func HandleWebSocket(c *websocket.Conn) {
 			c.WriteJSON(response)
 
 			// Notify LSP about save
-			lspManager.SendNotification("textDocument/didSave", map[string]interface{}{
+			if err := lspManager.RouteNotification("textDocument/didSave", map[string]interface{}{
 				"textDocument": map[string]interface{}{
 					"uri": "file://" + payload.Path,
 				},
-			})
+			}); err != nil {
+				log.Printf("Warning: Failed to notify LSP about save: %v", err)
+			}
 
 		case "lsp_request":
 			var payload LSPRequestPayload
@@ -239,7 +249,7 @@ func HandleWebSocket(c *websocket.Conn) {
 				json.Unmarshal(payload.Params, &params)
 			}
 
-			result, err := lspManager.SendRequest(payload.Method, params)
+			result, err := lspManager.RouteRequest(payload.Method, params)
 			if err != nil {
 				sendError(c, "LSP request failed: "+err.Error())
 				continue

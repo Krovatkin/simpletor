@@ -483,12 +483,13 @@ window.openFileFromUI = (path) => {
 };
 
 // Configure LSP from UI
-window.configureLSPFromUI = (clangdPath, compileCommandsDir) => {
+window.configureLSPFromUI = (language, serverPath, compileCommandsDir) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
             type: 'configure_lsp',
             payload: {
-                clangdPath: clangdPath || 'clangd',
+                language: language,
+                serverPath: serverPath || '',
                 compileCommandsDir,
             },
         }));

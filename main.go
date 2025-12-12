@@ -24,9 +24,9 @@ func main() {
 		DisableStartupMessage: false,
 	})
 
-	// Initialize LSP manager
-	lspManager := server.NewLSPManager()
-	defer lspManager.Shutdown()
+	// Initialize Multi-LSP manager
+	lspManager := server.NewMultiLSPManager()
+	defer lspManager.ShutdownAll()
 
 	// WebSocket upgrade middleware
 	app.Use("/ws", func(c *fiber.Ctx) error {
